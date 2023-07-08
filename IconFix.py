@@ -42,7 +42,7 @@ try:
             key, value = line.split('=', 1)
             cookies[key] = value
 except ValueError:
-    exit
+    os._exit(1)
 #计算相似度
 def compare_name(dir_list,name_list):
     count=0
