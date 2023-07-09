@@ -12,7 +12,7 @@
 2. 因为不是官方提供的真正的ico文件，所以可能会有些不同，
   例如巫师三完全不同（但更好看了），主播女孩重度依赖则是较为模糊
 
-  ![image](https://github.com/Einck0/IconFix/assets/91471683/47a5357f-3df5-47cd-a860-6adcad4466f1)
+    ![image](https://github.com/Einck0/IconFix/assets/91471683/47a5357f-3df5-47cd-a860-6adcad4466f1)
 
 4. 因为要爬取Steam网站所以可能会无法连接，则需要使用魔法
 
