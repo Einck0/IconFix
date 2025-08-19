@@ -1,100 +1,218 @@
 import os
-from requests import get
+import sys
 import re
-#初始化
-dir_dict={}
+import ctypes
+import logging
+import argparse
+from requests import get
 
-#爬取名字
-headers={'User-Agnet':"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.41"}
-
-# 获取文件夹中的所有文件名
-def get_file_list(folder_path,type):
-    if type == 'ico':
-        ico_files = []
-        for root, dirs, files in os.walk(folder_path):
-            for file in files:
-                if file.endswith('.ico'):
-                    ico_files.append(os.path.join(root, file))
-            for dir in dirs:
-                ico_files += get_file_list(dir, 'ico')
-        return ico_files
-    file_list = os.listdir(folder_path)
-    files = [file_name for file_name in file_list if file_name.endswith('.'+type)]
-    #将文件名按照长度顺序排序
-    files.sort(key=lambda x:len(x))
-    return files
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
-# 添加图标
-def add_icon(file_name,folder_path):
-    if file_name == '0':
-        return
-    # 打开文件并读取内容
-    with open(os.path.join(folder_path, file_name), 'r') as file:
-        content = file.read()
-    pattern=r'URL=steam://rungameid/(.*)'
-    id=re.findall(pattern,content)
-    pattern = re.compile(r'IconFile=(.*\\(.*\.ico))')
-    icon_path = pattern.search(content)
-    if icon_path:
-        icon_name = icon_path.group(2)
-    else:
-        print('未找到图标路径')
-        os.system('pause')
-        os._exit(1)
-    url=r'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/'
-    url+=id[0]
-    url+='//'+icon_name
-    ico=get(url,headers=headers)
-    if ico.status_code!=200:
-        print('{0:<30}'.format(file_name)+'图标下载失败')
-        return 
-    icon_path=icon_path.group(1)
+def is_admin():
+    """
+    Checks if the current script is running with administrator privileges.
+    """
     try:
-        with open(icon_path, 'wb') as file:
-            file.write(ico.content)
-    except PermissionError:
-        print('{0:<30}'.format(file_name)+'Permission Denied')
-        print('\n请关闭文件后，右键管理员权限再次运行程序\n')
-        os.system('pause')
-        os._exit(1)
-    print('{0:<30}'.format(file_name)+'已修复')
-def main():
-    # 获取文件
-    folder_path = os.getcwd()
-    public_path=r'C:\Users\Public\Desktop'
-    print('当前文件夹为：'+folder_path)
-    url_files = get_file_list(folder_path,'url')
-    count=len(url_files)
-    url_files+= get_file_list(public_path,'url')
-    #选择需要修改的文件
-    print('找到'+str(len(url_files))+'个Steam快捷方式')
-    print('0'+':全部')
-    for i in range(len(url_files)):
-        print('{:<30}'.format(str(i+1)+':'+url_files[i]),end='')
-        if (i+1)%3==0:
-            print('\n',end='')
-    print('\n请选择需要修改的文件(用空格隔开)：')
-    num_list=list(map(int,input().split()))
-    if 0 not in num_list:
-        for i in range(len(url_files)):
-            if i+1 not in num_list:
-                url_files[i]='0'
-    # 修复图标
-    print('单个文件修复时间小于1秒，若时间过长请科学上网，或耐心等候')
-    print('开始修复图标...\n')
-    i=0
-    while i < count:
-        add_icon(url_files[i],folder_path)
-        i+=1
-    print('当前文件夹已修复完成，尝试修复公共桌面快捷方式图标...')
-    while i < len(url_files):
-        add_icon(url_files[i],public_path)
-        i+=1
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except Exception as e:
+        logging.error(f"Error checking for administrator privileges: {e}")
+        return False
 
-    print('\n如遇问题，请联系作者\n')
-    print(r'Github:https://github.com/Einck0/IconFix')
-    os.system('pause')
+
+def run_as_admin():
+    """
+    Re-runs the current script with administrator privileges.
+    """
+    if sys.version_info[0] == 3:
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", sys.executable, " ".join(sys.argv), None, 1
+        )
+    else:
+        logging.error("Unsupported Python version for running as admin.")
+    sys.exit(0)
+
+
+# Request headers for web requests
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.41"
+}
+
+PUBLIC_DESKTOP_PATH = r"C:\Users\Public\Desktop"
+
+
+def get_file_list(directory_path, file_extension):
+    """
+    Recursively gets a list of files with a specific extension from a directory.
+    """
+    found_files = []
+    for root, _, files in os.walk(directory_path):
+        for file in files:
+            if file.endswith(f".{file_extension}"):
+                found_files.append(os.path.join(root, file))
+    return found_files
+
+
+def download_and_add_icon(shortcut_file_path):
+    """
+    Downloads and replaces the icon for a given Steam shortcut file.
+    """
+    if not shortcut_file_path or shortcut_file_path == "0":
+        return
+
+    try:
+        with open(shortcut_file_path, "r", encoding="utf-8", errors="ignore") as file:
+            content = file.read()
+    except Exception as e:
+        logging.error(f"Error reading shortcut file {shortcut_file_path}: {e}")
+        return
+
+    steam_id_match = re.search(r"URL=steam://rungameid/(\d+)", content)
+    if not steam_id_match:
+        logging.warning(f"Steam ID not found in {shortcut_file_path}. Skipping.")
+        return
+    steam_id = steam_id_match.group(1)
+
+    icon_path_match = re.search(r"IconFile=(.*\\(.*\.ico))", content)
+    if not icon_path_match:
+        logging.error(f"Icon path not found in {shortcut_file_path}. Skipping.")
+        return
+    full_icon_path = icon_path_match.group(1)
+    icon_name = icon_path_match.group(2)
+
+    icon_download_url = f"https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/{steam_id}/{icon_name}"
+
+    try:
+        response = get(icon_download_url, headers=HEADERS, timeout=10)
+        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
+    except Exception as e:
+        logging.error(
+            f"Error downloading icon for {shortcut_file_path} from {icon_download_url}: {e}"
+        )
+        return
+
+    if response.status_code != 200:
+        logging.error(
+            f"{shortcut_file_path:<50} Icon download failed with status code {response.status_code}"
+        )
+        return
+
+    try:
+        with open(full_icon_path, "wb") as icon_file:
+            icon_file.write(response.content)
+        logging.info(f"{shortcut_file_path:<50} Icon fixed successfully.")
+    except PermissionError:
+        logging.error(
+            f"{shortcut_file_path:<50} Permission Denied. Please close the file and run the program as administrator."
+        )
+        # Do not exit here, allow other files to be processed if possible
+    except Exception as e:
+        logging.error(f"Error writing icon to {full_icon_path}: {e}")
+
+
+def get_shortcut_files(base_path):
+    """
+    Collects Steam shortcut files from the specified base path and public desktop.
+    """
+    logging.info(f"Searching for shortcuts in: {base_path}")
+    local_shortcuts = get_file_list(base_path, "url")
+    public_shortcuts = get_file_list(PUBLIC_DESKTOP_PATH, "url")
+
+    all_shortcuts = local_shortcuts + public_shortcuts
+    logging.info(f"Found {len(all_shortcuts)} Steam shortcuts.")
+    return all_shortcuts, len(local_shortcuts)
+
+
+def select_files_to_process(all_shortcuts, local_shortcut_count):
+    """
+    Allows the user to select which shortcut files to process.
+    """
+    print("0: All files")
+    for i, file_path in enumerate(all_shortcuts):
+        print(f"{i + 1}: {file_path}")
+    print("\nPlease select files to modify (separate numbers with spaces):")
+
+    try:
+        user_input = input().strip()
+        if not user_input:
+            return [], 0  # No selection, return empty list
+
+        num_list = list(map(int, user_input.split()))
+    except ValueError:
+        logging.error("Invalid input. Please enter numbers separated by spaces.")
+        return [], 0
+
+    if 0 in num_list:
+        return all_shortcuts, local_shortcut_count
+    else:
+        selected_shortcuts = []
+        for i in range(len(all_shortcuts)):
+            if i + 1 in num_list:
+                selected_shortcuts.append(all_shortcuts[i])
+            else:
+                selected_shortcuts.append("0")  # Mark as '0' to skip
+        return selected_shortcuts, local_shortcut_count
+
+
+def process_icons(base_path):
+    """
+    Main function to process and fix Steam shortcut icons.
+    """
+    all_shortcuts, local_shortcut_count = get_shortcut_files(base_path)
+    if not all_shortcuts:
+        logging.info("No Steam shortcuts found. Exiting.")
+        return
+
+    selected_shortcuts, _ = select_files_to_process(all_shortcuts, local_shortcut_count)
+
+    if not selected_shortcuts or all(s == "0" for s in selected_shortcuts):
+        logging.info("No files selected for processing. Exiting.")
+        return
+
+    print(
+        "Individual file fix time is less than 1 second. If it takes too long, consider using a proxy or waiting patiently."
+    )
+    logging.info("Starting icon fix...\n")
+
+    for i, shortcut_file in enumerate(selected_shortcuts):
+        if shortcut_file != "0":
+            download_and_add_icon(shortcut_file)
+
+    logging.info("\nIcon fix complete!")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Fix Steam shortcut icons.")
+    parser.add_argument(
+        "-path", type=str, help="Manually set the folder path to search for shortcuts."
+    )
+    args = parser.parse_args()
+
+    target_folder_path = args.path if args.path else os.getcwd()
+
+    if not is_admin():
+        logging.info(
+            "Not running as administrator. Attempting to re-run with elevated privileges..."
+        )
+        run_as_admin()
+        # The script will exit here and re-launch as admin.
+        # The following code will only execute if already running as admin or if re-launch fails.
+        return
+
+    try:
+        os.system("cls" if os.name == "nt" else "clear")  # Clear console
+        logging.info("Starting Steam icon fixer...\n")
+        process_icons(target_folder_path)
+    except Exception as e:
+        logging.error(f"An unexpected error occurred during icon fixing: {e}")
+    finally:
+        logging.info("\nFixing process finished.")
+        print("\nIf you encounter any issues, please contact the author:")
+        print("Github: https://github.com/Einck0/IconFix")
+        input("Press Enter to exit...")  # Use input for pause
+
 
 if __name__ == "__main__":
     main()
