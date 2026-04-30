@@ -46,22 +46,28 @@ pip install .
 
 ## 使用方式
 
-在项目目录运行：
+推荐的一键运行方式，不需要安装 Python：
 
 ```powershell
-python IconFix.py
+irm 'https://raw.githubusercontent.com/Einck0/IconFix/main/IconFix.ps1' | iex
 ```
 
-零环境 PowerShell 运行方式：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/Einck0/IconFix/main/IconFix.ps1'; $p=Join-Path $env:TEMP 'IconFix.ps1'; Invoke-WebRequest -UseBasicParsing $u -OutFile $p; & $p"
-```
-
-如果想直接修复扫描到的全部快捷方式：
+如果需要直接修复扫描到的全部快捷方式，推荐使用稳定传参方式：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/Einck0/IconFix/main/IconFix.ps1'; $p=Join-Path $env:TEMP 'IconFix.ps1'; Invoke-WebRequest -UseBasicParsing $u -OutFile $p; & $p -All"
+```
+
+如果需要指定扫描目录：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/Einck0/IconFix/main/IconFix.ps1'; $p=Join-Path $env:TEMP 'IconFix.ps1'; Invoke-WebRequest -UseBasicParsing $u -OutFile $p; & $p -Path 'D:\Games\Shortcuts' -All"
+```
+
+也可以在项目目录直接运行 Python 版本：
+
+```powershell
+python IconFix.py
 ```
 
 常用参数：
