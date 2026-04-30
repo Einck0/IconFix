@@ -1,0 +1,13 @@
+[project]
+name = "iconfix"
+version = "2.0.0"
+description = "Fix broken Steam shortcut icons on Windows by re-downloading the original icon files."
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+iconfix = "iconfix.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
