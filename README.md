@@ -1,4 +1,4 @@
-# IconFix 2.0
+# IconFix 2.1
 
 `IconFix` 用于修复 Windows 上 Steam 游戏快捷方式图标丢失、变白或失效的问题。程序会扫描 `.url` 快捷方式，提取其中的 `Steam App ID` 与图标文件路径，然后重新下载官方图标并写回本地。
 
@@ -10,6 +10,12 @@
 - 补充命令行参数、版本号与项目元信息。
 - 增加基础测试，便于后续继续迭代。
 - 补充更完整的使用说明与优化学习笔记。
+
+## 2.1 版本改进
+
+- 新增纯 PowerShell 版 [IconFix.ps1](IconFix.ps1)，不需要安装 Python。
+- 支持在没有任何开发环境的 Windows 电脑上通过联网命令一键运行。
+- GitHub Release 包会同时附带 `IconFix.exe` 和 `IconFix.ps1`。
 
 ## 工作原理
 
@@ -23,6 +29,8 @@
 - Windows
 - Python 3.10+
 - v2.0 无第三方运行时依赖
+
+如果使用 `IconFix.ps1`，只需要 Windows 自带的 PowerShell 5.1 或更高版本，不需要 Python。
 
 ## 安装方式
 
@@ -44,6 +52,18 @@ pip install .
 python IconFix.py
 ```
 
+零环境 PowerShell 运行方式：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/Einck0/IconFix/main/IconFix.ps1'; $p=Join-Path $env:TEMP 'IconFix.ps1'; Invoke-WebRequest -UseBasicParsing $u -OutFile $p; & $p"
+```
+
+如果想直接修复扫描到的全部快捷方式：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/Einck0/IconFix/main/IconFix.ps1'; $p=Join-Path $env:TEMP 'IconFix.ps1'; Invoke-WebRequest -UseBasicParsing $u -OutFile $p; & $p -All"
+```
+
 常用参数：
 
 - `-path` / `--path`
@@ -63,6 +83,12 @@ python IconFix.py
 python IconFix.py --path "D:\Games\Shortcuts" --all
 ```
 
+PowerShell 版指定目录示例：
+
+```powershell
+.\IconFix.ps1 -Path "D:\Games\Shortcuts" -All
+```
+
 ## 管理员权限说明
 
 2.0 版本默认会在非管理员状态下主动申请管理员权限。这是因为以下场景常常需要更高权限：
@@ -77,6 +103,7 @@ python IconFix.py --path "D:\Games\Shortcuts" --all
 
 ```text
 IconFix.py
+IconFix.ps1
 iconfix/
   __init__.py
   cli.py

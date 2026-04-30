@@ -95,6 +95,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
           Copy-Item dist/IconFix.exe release/
+          Copy-Item IconFix.ps1 release/
           Copy-Item README.md release/
           if (Test-Path docs/optimization-notes-v2.0.md) {
             Copy-Item docs/optimization-notes-v2.0.md release/
@@ -107,6 +108,7 @@ jobs:
           name: IconFix-${{ steps.meta.outputs.tag }}
           path: |
             dist/IconFix.exe
+            IconFix.ps1
             ${{ steps.meta.outputs.zip_name }}
 
       - name: Create GitHub prerelease
@@ -116,6 +118,7 @@ jobs:
         run: |
           gh release create "${{ steps.meta.outputs.tag }}" `
             "dist/IconFix.exe" `
+            "IconFix.ps1" `
             "${{ steps.meta.outputs.zip_name }}" `
             --title "IconFix ${{ steps.meta.outputs.tag }}" `
             --prerelease `
