@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: Build And Publish Release
+    runs-on: windows-2022
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          }
+
+      - name: Validate release tag and version
+        id: meta
+        shell: pwsh
+        run: |
+          $version = python -c "from iconfix import __version__; print(__version__)"
+          $expectedTag = "v$version"
+          $actualTag = "${env:GITHUB_REF_NAME}"
+
+          if (-not $actualTag) {
+            throw "GITHUB_REF_NAME is empty. Release workflow must run from a tag push."
+          }
+
+          if ($actualTag -ne $expectedTag) {
+            throw "Tag $actualTag does not match package version $expectedTag."
+          }
+
+          $zip = "IconFix-$actualTag-windows-x64.zip"
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$actualTag" >> $env:GITHUB_OUTPUT
+          "zip_name=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v
+
+      - name: Build exe
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --name IconFix IconFix.py
+
+      - name: Prepare release package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist/IconFix.exe release/
+          Copy-Item README.md release/
+          if (Test-Path docs/optimization-notes-v2.0.md) {
+            Copy-Item docs/optimization-notes-v2.0.md release/
+          }
+          Compress-Archive -Path release/* -DestinationPath "${{ steps.meta.outputs.zip_name }}" -Force
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: IconFix-${{ steps.meta.outputs.tag }}
+          path: |
+            dist/IconFix.exe
+            ${{ steps.meta.outputs.zip_name }}
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" `
+            "dist/IconFix.exe" `
+            "${{ steps.meta.outputs.zip_name }}" `
+            --title "IconFix ${{ steps.meta.outputs.tag }}" `
+            --latest `
+            --generate-notes `
+            --verify-tag
