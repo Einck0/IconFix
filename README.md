@@ -131,47 +131,6 @@ docs/
 python -m unittest discover -s tests -v
 ```
 
-## CI/CD
-
-仓库已经内置 GitHub Actions 工作流：
-
-- `pull_request -> main`
-  自动运行测试，作为 CI。
-- `push -> main`
-  自动运行测试、打包 `IconFix.exe`，然后发布到 GitHub `Prerelease`。
-- `push tag -> v*`
-  自动运行测试、打包 `IconFix.exe`，然后发布到 GitHub 正式 `Release`。
-- `workflow_dispatch`
-  支持在 GitHub 页面手动触发。
-
-工作流文件位置：
-
-- [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml)
-- [.github/workflows/release.yml](.github/workflows/release.yml)
-
-首次启用前建议检查仓库设置：
-
-1. 在仓库 `Settings -> Actions -> General` 中允许 Actions 运行。
-2. 确认工作流权限允许写入仓库内容，以便自动创建 Release。
-
-正式版发布方式：
-
-1. 先把 [iconfix/__init__.py](iconfix/__init__.py) 里的 `__version__` 更新为目标版本，例如 `2.1.0`。
-2. 推送代码到 `main`，让 `Prerelease` 流程先跑通。
-3. 创建并推送同名标签，例如 `v2.1.0`。
-
-示例：
-
-```powershell
-git tag v2.1.0
-git push origin v2.1.0
-```
-
-注意：
-
-- 正式版工作流会校验 Git 标签是否与代码中的版本号一致。
-- 如果标签是 `v2.1.0`，那么 `__version__` 也必须是 `2.1.0`，否则工作流会主动失败。
-
 ## 学习资料
 
 2.0 版本的重构说明和优化思路已经整理到：

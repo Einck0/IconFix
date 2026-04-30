@@ -78,11 +78,14 @@ jobs:
         run: |
           $version = python -c "from iconfix import __version__; print(__version__)"
           $sha = "${env:GITHUB_SHA}".Substring(0, 7)
-          $tag = "v$version-pre.${env:GITHUB_RUN_NUMBER}.$sha"
-          $zip = "IconFix-$tag-windows-x64.zip"
+          $tag = "preview"
+          $title = "IconFix Preview v$version ($sha)"
+          $zip = "IconFix-preview-windows-x64.zip"
 
           "version=$version" >> $env:GITHUB_OUTPUT
+          "short_sha=$sha" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
+          "title=$title" >> $env:GITHUB_OUTPUT
           "zip_name=$zip" >> $env:GITHUB_OUTPUT
 
       - name: Build exe
@@ -111,6 +114,45 @@ jobs:
             IconFix.ps1
             ${{ steps.meta.outputs.zip_name }}
 
+      - name: Remove existing GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release delete $tag --cleanup-tag --yes
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            git push origin ":refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+          $legacyPattern = '^v\d+\.\d+\.\d+-pre\.'
+          $releaseList = gh release list --limit 100 --json tagName,isPrerelease
+          if ($LASTEXITCODE -eq 0 -and $releaseList) {
+            $releases = $releaseList | ConvertFrom-Json
+            foreach ($release in $releases) {
+              if ($release.isPrerelease -and $release.tagName -match $legacyPattern) {
+                gh release delete $release.tagName --cleanup-tag --yes
+                if ($LASTEXITCODE -ne 0) {
+                  exit $LASTEXITCODE
+                }
+              }
+            }
+          }
+
+          exit 0
+
       - name: Create GitHub prerelease
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -120,9 +162,9 @@ jobs:
             "dist/IconFix.exe" `
             "IconFix.ps1" `
             "${{ steps.meta.outputs.zip_name }}" `
-            --title "IconFix ${{ steps.meta.outputs.tag }}" `
+            --title "${{ steps.meta.outputs.title }}" `
             --prerelease `
             --latest=false `
             --generate-notes `
-            --notes "Automated prerelease from main branch." `
+            --notes "Automated preview from main branch. Version: ${{ steps.meta.outputs.version }}. Commit: ${{ steps.meta.outputs.short_sha }}." `
             --target "${{ github.sha }}"

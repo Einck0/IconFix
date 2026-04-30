@@ -139,6 +139,61 @@
 - 更适合这类体量较小的工具脚本。
 - 对“只有一个下载请求”的场景来说，实现复杂度仍然可控。
 
+## 10. CI/CD 与发布流程
+
+### 为什么放到优化笔记里
+
+- README 面向普通用户，应该优先回答“怎么运行、怎么使用”。
+- CI/CD 面向维护者，更适合放在学习笔记或维护文档中。
+- 这样项目首页更清爽，维护细节也不会丢。
+
+### 当前 GitHub Actions 工作流
+
+- `pull_request -> main`
+  自动运行测试，作为 CI。
+- `push -> main`
+  自动运行测试、打包 `IconFix.exe`，然后刷新 GitHub 上固定标签为 `preview` 的 `Prerelease`。
+- `push tag -> v*`
+  自动运行测试、打包 `IconFix.exe`，然后发布到 GitHub 正式 `Release`。
+- `workflow_dispatch`
+  支持在 GitHub 页面手动触发。
+
+### 工作流文件位置
+
+- `.github/workflows/ci-cd.yml`
+- `.github/workflows/release.yml`
+
+### 首次启用前需要检查
+
+1. 在仓库 `Settings -> Actions -> General` 中允许 Actions 运行。
+2. 确认工作流权限允许写入仓库内容，以便自动创建 Release。
+
+### 正式版发布方式
+
+1. 先把 `iconfix/__init__.py` 里的 `__version__` 更新为目标版本，例如 `2.1.0`。
+2. 推送代码到 `main`，让 `Prerelease` 流程先跑通。
+3. 创建并推送同名标签，例如 `v2.1.0`。
+
+示例：
+
+```powershell
+git tag v2.1.0
+git push origin v2.1.0
+```
+
+### 版本校验
+
+- 正式版工作流会校验 Git 标签是否与代码中的版本号一致。
+- 如果标签是 `v2.1.0`，那么 `__version__` 也必须是 `2.1.0`，否则工作流会主动失败。
+
+### 为什么 prerelease 只保留一个
+
+- `main` 分支可能频繁提交，如果每次提交都创建一个独立 prerelease，Release 页面会很快变乱。
+- 现在 prerelease 使用固定标签 `preview`。
+- 每次 `main` 更新时，工作流会删除旧的 `preview` prerelease 和 tag，再创建新的 `preview` prerelease。
+- 旧版工作流生成的 `v版本-pre...` prerelease 会被清理，避免历史预发布继续堆在 Release 页面。
+- 正式版本仍然使用 `v2.1.0` 这种语义化标签，便于长期归档。
+
 ## 版本定位
 
 - 当前重构版本：`v2.0.0`
